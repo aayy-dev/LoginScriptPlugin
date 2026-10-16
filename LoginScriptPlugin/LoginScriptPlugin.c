@@ -5,6 +5,9 @@
 //  Created by Per Olofsson on 2014-11-21.
 //  Copyright (c) 2014 Göteborgs universitet. All rights reserved.
 //
+//  Modified in 2026: VerifyScript() also accepts scripts on the Data volume
+//  (macOS 10.15 and later). See README.md.
+//
 
 #include <Security/AuthorizationPlugin.h>
 #include <Security/AuthSession.h>
@@ -267,8 +270,13 @@ static bool VerifyScript(const char *path, aslclient logClient)
         pathOK = false;
     }
     
-    // Reject if path isn't on boot volume.
-    if (info.st_dev != rootInfo.st_dev) {
+    // Reject if path isn't on boot volume. Since macOS 10.15 the boot volume
+    // is split into a read-only System volume (/) and a Data volume, which
+    // holds /Library, so accept either one. External volumes are still
+    // rejected.
+    struct stat dataInfo;
+    bool haveData = (lstat("/System/Volumes/Data", &dataInfo) == 0);
+    if (info.st_dev != rootInfo.st_dev && !(haveData && info.st_dev == dataInfo.st_dev)) {
         asl_log(logClient, NULL, ASL_LEVEL_WARNING, "%s is not on boot volume", path);
         pathOK = false;
     }
